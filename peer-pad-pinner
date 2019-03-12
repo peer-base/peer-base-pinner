@@ -2,6 +2,8 @@
 /* eslint no-console: "off" */
 'use strict'
 
+require('dotenv').config()
+
 const defaultName = 'peer-pad/2'
 const defaultSwarmAddress = '/dns4/ws-star1.par.dwebops.pub/tcp/443/wss/p2p-websocket-star'
 

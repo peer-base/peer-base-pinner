@@ -8,6 +8,7 @@ const Collaboration = require('peer-base/src/collaboration')
 const IPFS = require('peer-base/src/transport/ipfs')
 const PeerCountGuess = require('peer-base/src/peer-count-guess')
 const { decode, encode } = require('delta-crdts-msgpack-codec')
+const backplane = require('./backplane')
 
 const defaultOptions = {
   collaborationInactivityTimeoutMS: 10000
@@ -126,7 +127,7 @@ class AppPinner extends EventEmitter {
         } catch (e) {
           console.error('Exception:', e)
         }
-        console.log('Jim new collab pinner state as delta', collaboration.shared.stateAsDelta())
+        // console.log('Jim new collab pinner state as delta', collaboration.shared.stateAsDelta())
       }
     }
     collaboration.deliverRemoteMembership(membership).catch((err) => {
@@ -172,7 +173,7 @@ class AppPinner extends EventEmitter {
       const fqn = collaboration.fqn()
       let backup = ''
       const delta = collaboration.shared.stateAsDelta()
-      console.log('Jim changed pinner state as delta', delta)
+      // console.log('Jim changed pinner state as delta', delta)
       backup += `${fqn} ${encode(delta).toString('base64')}\n`
       for (let name of collaboration._subs.keys()) {
         const sub = collaboration._subs.get(name)

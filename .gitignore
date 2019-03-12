@@ -6,4 +6,4 @@ backup.txt
 npm-debug.log
 .DS_Store
 /*.env
-ipfs
+ipfs-repo
