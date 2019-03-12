@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+/* eslint no-console: "off" */
+'use strict'
+
+const defaultName = 'peer-pad/2'
+const defaultSwarmAddress = '/dns4/ws-star1.par.dwebops.pub/tcp/443/wss/p2p-websocket-star'
+
+const config = {
+  name: process.env.PEER_BASE_APP_NAME || process.env.PEER_STAR_APP_NAME || defaultName,
+  swarmAddress: process.env.PEER_BASE_SWARM_ADDRESS || process.env.PEER_STAR_SWARM_ADDRESS || defaultSwarmAddress
+}
+
+const createPinner = require('./index')
+
+const options = {}
+
+if (config.swarmAddress) {
+  console.log('using swarm address %j', config.swarmAddress)
+  options.ipfs = {
+    swarm: [config.swarmAddress]
+  }
+}
+
+console.log('pinning app %s', config.name)
+
+process.on('unhandledRejection', (err) => {
+  console.error(err)
+})
+
+const pinner = createPinner(config.name, options)
+
+setInterval(() => {}, 24 * 60 * 60 * 1000) // Keep pinner alive during startup
+pinner.start().then(() => {
+  startHealthEndpointServer().catch((err) => {
+    console.error('error starting health endpoint:', err)
+    process.exit(1)
+  })
+})
+
+function startHealthEndpointServer () {
+  const metricsRegistry = require('./pinner-metrics')(pinner)
+
+  return new Promise((resolve, reject) => {
+    let started = false
+
+    const server = require('http').createServer(onRequest)
+    const port = process.env.PORT || 3001
+    const host = process.env.HOST || '0.0.0.0'
+
+    server.once('error', (err) => {
+      if (!started) {
+        reject(err)
+      }
+    })
+    server.listen({ port, host }, () => {
+      console.log('Health endpoint listening on port', port)
+      started = true
+      resolve()
+    })
+  })
+
+  function onRequest (request, response) {
+    switch (request.url) {
+      case '/health':
+        pinner.ipfs.id().then((peer) => {
+          response.writeHead(200, { 'content-type': 'text/json' })
+          response.end(JSON.stringify({
+            app: config.name,
+            id: peer.id
+          }))
+        })
+        break
+      case '/prometheus':
+        response.writeHead(200, { 'content-type': 'text/plain' })
+        response.end(metricsRegistry.metrics())
+        break
+      default:
+        response.writeHead(404)
+        response.end('Not found')
+    }
+  }
+}

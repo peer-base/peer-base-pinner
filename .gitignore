@@ -1,0 +1,8 @@
+node_modules
+*.swp
+package-lock.json
+yarn.lock
+backup.txt
+npm-debug.log
+.DS_Store
+/*.env

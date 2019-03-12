@@ -1,0 +1,30 @@
+{
+  "name": "peer-base-pinner",
+  "version": "1.0.0",
+  "description": "A pinner for peer-pad ... backup collaborations using IPFS, IPLD, IPNS + ipfs-cluster",
+  "leadMaintainer": "Jim Pick <jim@jimpick.com>",
+  "main": "index.js",
+  "bin": {
+    "peer-pad-pinner": "./peer-pad-pinner"
+  },
+  "scripts": {
+    "start": "node ./peer-pad-pinner"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ipfs-shipyard/peer-base-pinner.git"
+  },
+  "keywords": [],
+  "author": "Jim Pick (@jimpick)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ipfs-shipyard/peer-base-pinner/issues"
+  },
+  "homepage": "https://github.com/ipfs-shipyard/peer-base-pinner#readme",
+  "dependencies": {
+    "peer-base": "^0.12.0-rc6"
+  },
+  "engines": {
+    "node": "10.x"
+  }
+}
