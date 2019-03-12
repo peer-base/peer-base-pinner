@@ -5,5 +5,5 @@ yarn.lock
 backup.txt
 npm-debug.log
 .DS_Store
-/*.env
+/*.env*
 ipfs-repo

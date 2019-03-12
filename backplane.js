@@ -1,4 +1,3 @@
-const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const util = require('util')
@@ -13,11 +12,18 @@ require('dotenv').config()
 const IPFS_BIN = './node_modules/go-ipfs-dep/go-ipfs/ipfs'
 const repoDir = path.resolve(process.cwd(), 'ipfs-repo')
 
+function checkEnv (key, message) {
+  if (!process.env[key]) {
+    console.error(`Need ${key} in environment`)
+    process.exit(1)
+  }
+}
+
 async function create () {
   mkdirp.sync(repoDir)
   const generatedConfig = tempy.file()
-  assert(process.env.PEER_ID, 'Need PEER_ID')
-  assert(process.env.PRIV_KEY, 'Need PRIV_KEY')
+  checkEnv('PEER_ID', 'Need PEER_ID')
+  checkEnv('PRIV_KEY', 'Need PRIV_KEY')
   configTemplate.Identity.PeerId = process.env.PEER_ID
   configTemplate.Identity.PrivKey = process.env.PRIV_KEY
   fs.writeFileSync(generatedConfig, JSON.stringify(configTemplate, null, 2))
