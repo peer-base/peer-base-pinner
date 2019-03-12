@@ -1,2 +1,2 @@
 # peer-base-pinner
-A pinner for peer-pad ... backup collaborations using IPFS, IPLD, IPNS + ipfs-cluster
+A pinner for peer-base ... backup collaborations using IPFS, IPLD, IPNS + ipfs-cluster
