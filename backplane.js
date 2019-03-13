@@ -27,6 +27,15 @@ async function create () {
   checkEnv('PRIV_KEY', 'Need PRIV_KEY')
   configTemplate.Identity.PeerId = process.env.PEER_ID
   configTemplate.Identity.PrivKey = process.env.PRIV_KEY
+  if (process.env.BOOTSTRAP1) {
+    configTemplate.Bootstrap.push(process.env.BOOTSTRAP1)
+  }
+  if (process.env.BOOTSTRAP2) {
+    configTemplate.Bootstrap.push(process.env.BOOTSTRAP2)
+  }
+  if (process.env.BOOTSTRAP3) {
+    configTemplate.Bootstrap.push(process.env.BOOTSTRAP3)
+  }
   fs.writeFileSync(generatedConfig, JSON.stringify(configTemplate, null, 2))
   const { stdout } = await execFile(
     IPFS_BIN, [ 'init', generatedConfig ],

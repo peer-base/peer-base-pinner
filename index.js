@@ -206,6 +206,9 @@ class AppPinner extends EventEmitter {
       }
       fs.writeFileSync('./backup.txt', backup)
       console.log('Saved state:', fqn, delta[1])
+      this.backplaneIpfs.add(encode(delta), (err, res) => {
+        console.log('Saved delta to IPFS:', res)
+      })
 
       resetActivityTimeout()
     }
