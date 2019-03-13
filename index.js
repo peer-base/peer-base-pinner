@@ -8,10 +8,11 @@ const Collaboration = require('peer-base/src/collaboration')
 const IPFS = require('peer-base/src/transport/ipfs')
 const PeerCountGuess = require('peer-base/src/peer-count-guess')
 const { decode, encode } = require('delta-crdts-msgpack-codec')
+const debounce = require('lodash.debounce')
 const backplane = require('./backplane')
 
 const defaultOptions = {
-  collaborationInactivityTimeoutMS: 10000
+  collaborationInactivityTimeoutMS: 2 * 60 * 1000
 }
 
 class AppPinner extends EventEmitter {
@@ -110,6 +111,7 @@ class AppPinner extends EventEmitter {
       collaboration = this._collaborations.get(collaborationName)
     } else {
       debug('new collaboration %s of type %s', collaborationName, type)
+      console.log('New:', collaborationName)
       if (type) {
         collaboration = this._addCollaboration(collaborationName, type)
         await collaboration.start()
@@ -120,7 +122,7 @@ class AppPinner extends EventEmitter {
             if (line.startsWith(collaborationName + ' ')) {
               const encodedDelta = line.slice(collaborationName.length + 1)
               const delta = decode(Buffer.from(encodedDelta, 'base64'))
-              console.log(delta)
+              // console.log(delta)
               collaboration.shared.apply(delta)
             }
           }
@@ -146,6 +148,7 @@ class AppPinner extends EventEmitter {
 
     const onInactivityTimeout = () => {
       debug('collaboration %j timed out. Removing it...', name, type)
+      console.log('Timed out:', name)
       collaboration.removeListener('state changed', onStateChanged)
       this._collaborations.delete(name)
 
@@ -178,15 +181,18 @@ class AppPinner extends EventEmitter {
       for (let name of collaboration._subs.keys()) {
         const sub = collaboration._subs.get(name)
         const subDelta = sub.shared.stateAsDelta()
-        console.log(` Sub ${name}:`, subDelta)
+        // console.log(` Sub ${name}:`, subDelta)
         backup += `${fqn}:${name} ${encode(subDelta).toString('base64')}\n`
       }
       fs.writeFileSync('./backup.txt', backup)
+      console.log('Saved state:', fqn, delta[1])
 
       resetActivityTimeout()
     }
 
-    collaboration.on('state changed', onStateChanged)
+    const debouncedOnStateChanged = debounce(onStateChanged, 500)
+
+    collaboration.on('state changed', debouncedOnStateChanged)
 
     resetActivityTimeout()
 

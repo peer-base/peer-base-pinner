@@ -33,6 +33,9 @@ const pinner = createPinner(config.name, options)
 
 setInterval(() => {}, 24 * 60 * 60 * 1000) // Keep pinner alive during startup
 pinner.start().then(() => {
+  pinner.peerId().then(id => {
+    console.log('Pinner Peer Id:', id)
+  })
   startHealthEndpointServer().catch((err) => {
     console.error('error starting health endpoint:', err)
     process.exit(1)
