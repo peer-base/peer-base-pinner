@@ -24,6 +24,7 @@
   "dependencies": {
     "dotenv": "^6.2.0",
     "go-ipfs-dep": "^0.4.18",
+    "ipfs-http-client": "^29.1.1",
     "lodash.debounce": "^4.0.8",
     "peer-base": "^0.12.0-rc6",
     "tempy": "^0.2.1"

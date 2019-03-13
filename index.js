@@ -35,18 +35,38 @@ class AppPinner extends EventEmitter {
       return this._starting
     }
 
-    this._starting = new Promise((resolve, reject) => {
-      const ipfsOptions = (this._options && this._options.ipfs) || {}
-      this.ipfs = IPFS(this, ipfsOptions)
-      if (this.ipfs.isOnline()) {
-        this.ipfs.on('error', (err) => this._handleIPFSError(err))
-        resolve()
-      } else {
-        this.ipfs.once('ready', () => {
+    this._starting = backplane.ready.then(backplaneIpfs => {
+      this.backplaneIpfs = backplaneIpfs
+      return new Promise((resolve, reject) => {
+        this.backplaneIpfs.id((err, identity) => {
+          if (err) {
+            console.error('Error', err)
+            return reject(err)
+          }
+          this.backplaneId = identity.id
+          this.backplaneAddresses = identity.addresses
+          console.log('Backplane Peer Id:', this.backplaneId)
+          console.log('Backplane Peer Addresses:')
+          for (const address of this.backplaneAddresses) {
+            console.log(`  ${address}`)
+          }
+          resolve(identity)
+        })
+      })
+    }).then(() => {
+      return new Promise((resolve, reject) => {
+        const ipfsOptions = (this._options && this._options.ipfs) || {}
+        this.ipfs = IPFS(this, ipfsOptions)
+        if (this.ipfs.isOnline()) {
           this.ipfs.on('error', (err) => this._handleIPFSError(err))
           resolve()
-        })
-      }
+        } else {
+          this.ipfs.once('ready', () => {
+            this.ipfs.on('error', (err) => this._handleIPFSError(err))
+            resolve()
+          })
+        }
+      })
     }).then(() => {
       this._peerCountGuess.start()
       console.log('pinner for %j started', this.name)

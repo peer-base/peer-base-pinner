@@ -5,6 +5,7 @@ const { spawn } = require('child_process')
 const execFile = util.promisify(require('child_process').execFile)
 const mkdirp = require('mkdirp')
 const tempy = require('tempy')
+const ipfsClient = require('ipfs-http-client')
 const configTemplate = require('./go-ipfs-config.json')
 
 require('dotenv').config()
@@ -40,11 +41,24 @@ const ready = async function () {
   }
 
   console.log('Run IPFS')
-  const ipfsProcess = spawn(IPFS_BIN, [ 'daemon' ], {
-    env: { 'IPFS_PATH': repoDir },
-    stdio: 'inherit'
+  await new Promise((resolve, reject) => {
+    const ipfsProcess = spawn(IPFS_BIN, [ 'daemon' ], {
+      env: { 'IPFS_PATH': repoDir }
+    })
+    ipfsProcess.stdout.on('data', data => {
+      console.log(`${data}`)
+      if (`${data}`.startsWith('Daemon is ready')) {
+        resolve()
+      }
+    })
+    ipfsProcess.stderr.on('data', data => {
+      console.log(`${data}`)
+    })
   })
-  console.log('Lookup IPNS')
+
+  //console.log('Lookup IPNS')
+  const ipfs = ipfsClient('/ip4/127.0.0.1/tcp/25001')
+  return ipfs
 }()
 
 module.exports = {
