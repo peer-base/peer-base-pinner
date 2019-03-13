@@ -53,6 +53,9 @@ const ready = async function () {
     })
     ipfsProcess.stderr.on('data', data => {
       console.log(`${data}`)
+      if (`${data}`.startsWith('Daemon is ready')) {
+        resolve()
+      }
     })
   })
 
