@@ -38,19 +38,28 @@ class AppPinner extends EventEmitter {
     this._starting = backplane.ready.then(backplaneIpfs => {
       this.backplaneIpfs = backplaneIpfs
       return new Promise((resolve, reject) => {
-        this.backplaneIpfs.id((err, identity) => {
-          if (err) {
-            console.error('Error', err)
-            return reject(err)
-          }
-          this.backplaneId = identity.id
-          this.backplaneAddresses = identity.addresses
-          console.log('Backplane Peer Id:', this.backplaneId)
-          console.log('Backplane Peer Addresses:')
-          for (const address of this.backplaneAddresses) {
-            console.log(`  ${address}`)
-          }
-          resolve(identity)
+        const getIdAndAddresses = cb => {
+          this.backplaneIpfs.id((err, identity) => {
+            if (err) {
+              console.error('Error', err)
+              return cb && cb(err)
+            }
+            this.backplaneId = identity.id
+            this.backplaneAddresses = identity.addresses
+            console.log('Backplane Peer Id:', this.backplaneId)
+            console.log('Backplane Peer Addresses:')
+            for (const address of this.backplaneAddresses) {
+              console.log(`  ${address}`)
+            }
+            cb && cb()
+          })
+        }
+        getIdAndAddresses(err => {
+          if (err) return reject(err)
+          // Periodically poll to get updated addresses (might
+          // change thanks to autorelay)
+          setInterval(getIdAndAddresses, 20 * 1000)
+          resolve()
         })
       })
     }).then(() => {
