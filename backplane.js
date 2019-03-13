@@ -46,14 +46,14 @@ const ready = async function () {
       env: { 'IPFS_PATH': repoDir }
     })
     ipfsProcess.stdout.on('data', data => {
-      console.log(`${data}`)
+      process.stdout.write(data)
       const lines = `${data}`.split('\n')
       if (lines.find(line => line.startsWith('Daemon is ready'))) {
         resolve()
       }
     })
     ipfsProcess.stderr.on('data', data => {
-      console.log(`stderr: ${data}`)
+      process.stdout.write(data)
     })
   })
 
