@@ -88,6 +88,24 @@ class AppPinner extends EventEmitter {
     .then(() => {
       this._peerCountGuess.start()
       console.log('pinner for %j started', this.name)
+      setTimeout(() => {
+        this.ipfs.swarm.connect(
+          `/ip4/127.0.0.1/tcp/24001/ipfs/${this.backplaneId}`
+        )
+      }, 3000)
+
+      // Try to connect to custom bootstrap servers in a loop
+      const interval = 60 * 1000
+      const connect = this.backplaneIpfs.swarm.connect
+      if (process.env.BOOTSTRAP1) {
+        setInterval(() => connect(process.env.BOOTSTRAP1), interval)
+      }
+      if (process.env.BOOTSTRAP2) {
+        setInterval(() => connect(process.env.BOOTSTRAP2), interval)
+      }
+      if (process.env.BOOTSTRAP3) {
+        setInterval(() => connect(process.env.BOOTSTRAP3), interval)
+      }
     })
 
     return this._starting
