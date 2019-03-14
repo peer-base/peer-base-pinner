@@ -8,6 +8,7 @@ const Collaboration = require('peer-base/src/collaboration')
 const IPFS = require('peer-base/src/transport/ipfs')
 const PeerCountGuess = require('peer-base/src/peer-count-guess')
 const { decode, encode } = require('delta-crdts-msgpack-codec')
+const CID = require('cids')
 const debounce = require('lodash.debounce')
 const backplane = require('./backplane')
 
@@ -58,11 +59,18 @@ class AppPinner extends EventEmitter {
           if (err) return reject(err)
           // Periodically poll to get updated addresses (might
           // change thanks to autorelay)
-          setInterval(getIdAndAddresses, 20 * 1000)
+          setInterval(getIdAndAddresses, 2 * 60 * 1000)
           resolve()
         })
       })
-    }).then(() => {
+    })
+    .then(async () => {
+      this.docIndex = {}
+      this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
+      const cid = this.indexCid.toBaseEncodedString('base32')
+      console.log('DocIndex CID (blank):', cid)
+    })
+    .then(() => {
       return new Promise((resolve, reject) => {
         const ipfsOptions = (this._options && this._options.ipfs) || {}
         this.ipfs = IPFS(this, ipfsOptions)
@@ -76,7 +84,8 @@ class AppPinner extends EventEmitter {
           })
         }
       })
-    }).then(() => {
+    })
+    .then(() => {
       this._peerCountGuess.start()
       console.log('pinner for %j started', this.name)
     })
@@ -199,7 +208,7 @@ class AppPinner extends EventEmitter {
       activityTimeout = setTimeout(onInactivityTimeout, this._options.collaborationInactivityTimeoutMS)
     }
 
-    const onStateChanged = () => {
+    const onStateChanged = async () => {
       debug('state changed in collaboration %s', name)
 
       const fqn = collaboration.fqn()
@@ -215,9 +224,23 @@ class AppPinner extends EventEmitter {
       }
       fs.writeFileSync('./backup.txt', backup)
       console.log('Saved state:', fqn, delta[1])
-      this.backplaneIpfs.add(encode(delta), (err, res) => {
-        console.log('Saved delta to IPFS:', res)
-      })
+      const opts = { 'cid-version': 1 }
+      const res = await this.backplaneIpfs.add(encode(delta), opts)
+      if (res.length !== 1) throw new Error('Expected length 1')
+      const mainCid = new CID(res[0].hash)
+      /*
+      console.log(
+        'Saved main delta to IPFS:',
+        mainCid.toBaseEncodedString('base32')
+      )
+      */
+      this.docIndex[fqn] = {
+        main: mainCid
+      }
+      // console.log('Jim docIndex', this.docIndex)
+      this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
+      const cid = this.indexCid.toBaseEncodedString('base32')
+      console.log('DocIndex CID (updated):', cid)
 
       resetActivityTimeout()
     }
