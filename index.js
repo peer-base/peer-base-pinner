@@ -92,7 +92,7 @@ class AppPinner extends EventEmitter {
         this.ipfs.swarm.connect(
           `/ip4/127.0.0.1/tcp/24001/ipfs/${this.backplaneId}`
         )
-      }, 3000)
+      }, 10000) // FIXME: Need something more reliable
 
       // Try to connect to custom bootstrap servers in a loop
       const interval = 60 * 1000
