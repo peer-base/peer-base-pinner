@@ -271,6 +271,18 @@ class AppPinner extends EventEmitter {
       this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
       const cid = this.indexCid.toBaseEncodedString('base32')
       console.log('DocIndex CID (updated):', cid)
+      const cidBase58 = this.indexCid.toBaseEncodedString()
+      const ipfsPath = `/ipfs/${cidBase58}`
+      console.log('Updating IPNS...', ipfsPath)
+      const start = Date.now()
+      try {
+        const name = await this.backplaneIpfs.name.publish(ipfsPath)
+        const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
+        const ipnsPath = `/ipns/${this.backplaneId}`
+        console.log('IPNS updated:', ipnsPath, elapsed)
+      } catch (e) {
+        console.error('IPNS Exception:', e)
+      }
 
       resetActivityTimeout()
     }
