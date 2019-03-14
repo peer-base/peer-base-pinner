@@ -214,29 +214,41 @@ class AppPinner extends EventEmitter {
       const fqn = collaboration.fqn()
       let backup = ''
       const delta = collaboration.shared.stateAsDelta()
+      const clock = delta[1]
+
       // console.log('Jim changed pinner state as delta', delta)
       backup += `${fqn} ${encode(delta).toString('base64')}\n`
-      for (let name of collaboration._subs.keys()) {
-        const sub = collaboration._subs.get(name)
-        const subDelta = sub.shared.stateAsDelta()
-        // console.log(` Sub ${name}:`, subDelta)
-        backup += `${fqn}:${name} ${encode(subDelta).toString('base64')}\n`
-      }
-      fs.writeFileSync('./backup.txt', backup)
-      console.log('Saved state:', fqn, delta[1])
+      console.log('Saving state:', fqn, clock)
+
       const opts = { 'cid-version': 1 }
       const res = await this.backplaneIpfs.add(encode(delta), opts)
       if (res.length !== 1) throw new Error('Expected length 1')
       const mainCid = new CID(res[0].hash)
+      this.docIndex[fqn] = {
+        main: mainCid,
+        clock,
+        date: Date.now(),
+        subs: {}
+      }
+
+      for (let name of collaboration._subs.keys()) {
+        const sub = collaboration._subs.get(name)
+        const subDelta = sub.shared.stateAsDelta()
+        const res = await this.backplaneIpfs.add(encode(subDelta), opts)
+        if (res.length !== 1) throw new Error('Expected length 1')
+        const cid = new CID(res[0].hash)
+        this.docIndex[fqn].subs[name] = cid
+
+        // console.log(` Sub ${name}:`, subDelta)
+        backup += `${fqn}:${name} ${encode(subDelta).toString('base64')}\n`
+      }
+      fs.writeFileSync('./backup.txt', backup)
       /*
       console.log(
         'Saved main delta to IPFS:',
         mainCid.toBaseEncodedString('base32')
       )
       */
-      this.docIndex[fqn] = {
-        main: mainCid
-      }
       // console.log('Jim docIndex', this.docIndex)
       this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
       const cid = this.indexCid.toBaseEncodedString('base32')
