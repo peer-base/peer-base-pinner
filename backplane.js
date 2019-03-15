@@ -64,6 +64,9 @@ const ready = async function () {
     ipfsProcess.stderr.on('data', data => {
       process.stdout.write(data)
     })
+    process.on('exit', () => {
+      ipfsProcess.kill()
+    })
   })
 
   //console.log('Lookup IPNS')

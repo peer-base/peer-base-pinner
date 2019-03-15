@@ -23,6 +23,7 @@
   "homepage": "https://github.com/ipfs-shipyard/peer-base-pinner#readme",
   "dependencies": {
     "cids": "^0.5.7",
+    "delay": "^4.1.0",
     "dotenv": "^7.0.0",
     "go-ipfs-dep": "^0.4.19",
     "ipfs-http-client": "^30.0.0",

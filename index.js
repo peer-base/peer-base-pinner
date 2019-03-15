@@ -10,6 +10,7 @@ const PeerCountGuess = require('peer-base/src/peer-count-guess')
 const { decode, encode } = require('delta-crdts-msgpack-codec')
 const CID = require('cids')
 const debounce = require('lodash.debounce')
+const delay = require('delay')
 const backplane = require('./backplane')
 
 const defaultOptions = {
@@ -24,7 +25,10 @@ class AppPinner extends EventEmitter {
       throw new Error('pinner should have app name')
     }
     this._options = Object.assign({}, defaultOptions, options)
-    this._peerCountGuess = new PeerCountGuess(this, options && options.peerCountGuess)
+    this._peerCountGuess = new PeerCountGuess(
+      this,
+      options && options.peerCountGuess
+    )
     this._collaborations = new Map()
     this._starting = null
 
@@ -65,10 +69,54 @@ class AppPinner extends EventEmitter {
       })
     })
     .then(async () => {
-      this.docIndex = {}
-      this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
-      const cid = this.indexCid.toBaseEncodedString('base32')
-      console.log('DocIndex CID (blank):', cid)
+      if (
+        process.env.LOAD_FROM_IPNS &&
+        process.env.LOAD_FROM_IPNS != '0' &&
+        process.env.LOAD_FROM_IPNS.toLowerCase() != 'false'
+      ) {
+        try {
+          const ipnsPath = `/ipns/${this.backplaneId}`
+          console.log('Resolving', ipnsPath)
+          const name = await this.backplaneIpfs.resolve(ipnsPath)
+          console.log('Resolved IPNS:', name)
+          const hash = name.replace('/ipfs/', '')
+          console.log('Loading docIndex from IPFS', hash)
+          const result = await this.backplaneIpfs.dag.get(hash)
+          this.docIndex = result.value
+          console.log('docIndex loaded')
+        } catch (e) {
+          console.error('Exception during IPNS resolve', e)
+          process.exit(1)
+        }
+      } else if (
+        process.env.INIT_IPNS &&
+        process.env.INIT_IPNS != '0' &&
+        process.env.INIT_IPNS.toLowerCase() != 'false'
+      ) {
+        this.docIndex = {}
+        this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
+        const cid = this.indexCid.toBaseEncodedString('base32')
+        console.log('DocIndex CID (blank):', cid)
+        try {
+          const name = await this.backplaneIpfs.name.publish(ipfsPath)
+          const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
+          const ipnsPath = `/ipns/${this.backplaneId}`
+          console.log('IPNS updated:', ipnsPath, elapsed)
+        } catch (e) {
+          console.error('IPNS Exception:', e)
+        }
+        console.log('\nRemove INIT_IPNS, and set LOAD_FROM_IPNS=true')
+        console.log('and restart to continue')
+        while (true) {
+          await delay(60 * 1000) // Infinite loop
+        }
+      } else {
+        console.log('\nFirst, set INIT_IPNS=true to create empty index on IPNS,')
+        console.log('and then set LOAD_FROM_IPNS=true to load it.')
+        while (true) {
+          await delay(60 * 1000) // Infinite loop
+        }
+      }
     })
     .then(() => {
       return new Promise((resolve, reject) => {
@@ -199,7 +247,15 @@ class AppPinner extends EventEmitter {
       replicateOnly: true,
       receiveTimeoutMS: 6000
     }
-    const collaboration = Collaboration(true, this.ipfs, this._globalConnectionManager, this, name, type, options)
+    const collaboration = Collaboration(
+      true,
+      this.ipfs,
+      this._globalConnectionManager,
+      this,
+      name,
+      type,
+      options
+    )
     this._collaborations.set(name, collaboration)
 
     const onInactivityTimeout = () => {
@@ -223,7 +279,10 @@ class AppPinner extends EventEmitter {
       if (activityTimeout) {
         clearTimeout(activityTimeout)
       }
-      activityTimeout = setTimeout(onInactivityTimeout, this._options.collaborationInactivityTimeoutMS)
+      activityTimeout = setTimeout(
+        onInactivityTimeout,
+        this._options.collaborationInactivityTimeoutMS
+      )
     }
 
     const onStateChanged = async () => {
@@ -302,7 +361,10 @@ class AppPinner extends EventEmitter {
 
   async stop () {
     try {
-      await Promise.all(Array.from(this._collaborations.values()).map((collaboration) => collaboration.stop()))
+      await Promise.all(
+        Array.from(this._collaborations.values())
+          .map(collaboration => collaboration.stop())
+      )
     } catch (err) {
       console.error('error stopping collaborations:', err)
     }
