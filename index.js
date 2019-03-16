@@ -105,13 +105,19 @@ class AppPinner extends EventEmitter {
         try {
           const ipnsPath = `/ipns/${this.backplaneId}`
           log('Resolving', ipnsPath)
+          let start = Date.now()
           const name = await this.backplaneIpfs.resolve(ipnsPath)
-          log('Resolved IPNS:', name)
+          let elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
+          log('Resolved IPNS:', name, elapsed)
           const hash = name.replace('/ipfs/', '')
           log('Loading docIndex from IPFS', hash)
+          start = Date.now()
           const result = await this.backplaneIpfs.dag.get(hash)
+          elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
           this.docIndex = result.value
-          log('docIndex loaded')
+          log('docIndex loaded', elapsed)
+          log('republishing to IPNS to refresh')
+          await this.publish(hash)
         } catch (e) {
           console.error('Exception during IPNS resolve', e)
           process.exit(1)
@@ -125,16 +131,7 @@ class AppPinner extends EventEmitter {
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (blank):', cidBase58)
-        const start = Date.now()
-        try {
-          const ipfsPath = `/ipfs/${cidBase58}`
-          const name = await this.backplaneIpfs.name.publish(ipfsPath)
-          const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-          const ipnsPath = `/ipns/${this.backplaneId}`
-          log('IPNS updated:', ipnsPath, elapsed)
-        } catch (e) {
-          console.error('IPNS Exception:', e)
-        }
+        await this.publish(cidBase58)
         log('\nRemove INIT_IPNS, and set LOAD_FROM_IPNS=true')
         log('and restart to continue')
         while (true) {
@@ -350,17 +347,7 @@ class AppPinner extends EventEmitter {
       this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
       const cidBase58 = this.indexCid.toBaseEncodedString()
       log('DocIndex CID (updated):', cidBase58)
-      const ipfsPath = `/ipfs/${cidBase58}`
-      log('Updating IPNS...', ipfsPath)
-      const start = Date.now()
-      try {
-        const name = await this.backplaneIpfs.name.publish(ipfsPath)
-        const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-        const ipnsPath = `/ipns/${this.backplaneId}`
-        log('IPNS updated:', ipnsPath, elapsed)
-      } catch (e) {
-        console.error('IPNS Exception:', e)
-      }
+      await this.publish(cidBase58)
 
       resetActivityTimeout()
     }
@@ -394,6 +381,20 @@ class AppPinner extends EventEmitter {
     this._collaborations.clear()
     this._peerCountGuess.stop()
     await this.ipfs.stop()
+  }
+
+  async publish (cidBase58) {
+    const ipfsPath = `/ipfs/${cidBase58}`
+    log('Updating IPNS...', ipfsPath)
+    const start = Date.now()
+    try {
+      await this.backplaneIpfs.name.publish(ipfsPath)
+      const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
+      const ipnsPath = `/ipns/${this.backplaneId}`
+      log('IPNS updated:', ipnsPath, elapsed)
+    } catch (e) {
+      console.error('IPNS Exception:', e)
+    }
   }
 }
 
