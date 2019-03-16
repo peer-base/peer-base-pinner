@@ -97,6 +97,7 @@ class AppPinner extends EventEmitter {
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         console.log('DocIndex CID (blank):', cidBase58)
+        const start = Date.now()
         try {
           const ipfsPath = `/ipfs/${cidBase58}`
           const name = await this.backplaneIpfs.name.publish(ipfsPath)
