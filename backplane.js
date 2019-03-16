@@ -10,7 +10,7 @@ const configTemplate = require('./go-ipfs-config.json')
 
 require('dotenv').config()
 
-const IPFS_BIN = './node_modules/go-ipfs-dep/go-ipfs/ipfs'
+const IPFS_BIN = './node_modules/@jimpick/go-ipfs-dep/go-ipfs/ipfs'
 const repoDir = path.resolve(process.cwd(), 'ipfs-repo')
 
 function checkEnv (key, message) {

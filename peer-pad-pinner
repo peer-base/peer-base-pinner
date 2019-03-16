@@ -37,12 +37,10 @@ pinner.start().then(() => {
     console.log('Pinner Peer Id:', id)
   })
 })
-setTimeout(() => {
-  startHealthEndpointServer().catch((err) => {
-    console.error('error starting health endpoint:', err)
-    process.exit(1)
-  })
-}, 30 * 1000) // Heroku will exit if it takes more than 60 seconds to start
+startHealthEndpointServer().catch((err) => {
+  console.error('error starting health endpoint:', err)
+  process.exit(1)
+})
 
 function startHealthEndpointServer () {
   const metricsRegistry = require('./pinner-metrics')(pinner)

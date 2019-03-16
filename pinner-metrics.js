@@ -16,6 +16,7 @@ module.exports = (pinner) => {
   setInterval(() => {
     const numberOfCollabs = pinner._collaborations.size
     metrics.totalCollaborations.set(numberOfCollabs)
+    if (!pinner.ipfs) return
     pinner.ipfs.swarm.peers((err, peers) => {
       if (err) {
         throw err
