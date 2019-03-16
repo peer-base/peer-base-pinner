@@ -17,6 +17,10 @@ const defaultOptions = {
   collaborationInactivityTimeoutMS: 2 * 60 * 1000
 }
 
+function log (...args) {
+  console.log('pinner:', ...args)
+}
+
 class AppPinner extends EventEmitter {
   constructor (name, options) {
     super()
@@ -51,10 +55,10 @@ class AppPinner extends EventEmitter {
             }
             this.backplaneId = identity.id
             this.backplaneAddresses = identity.addresses
-            console.log('Backplane Peer Id:', this.backplaneId)
-            console.log('Backplane Peer Addresses:')
+            log('Backplane Peer Id:', this.backplaneId)
+            log('Backplane Peer Addresses:')
             for (const address of this.backplaneAddresses) {
-              console.log(`  ${address}`)
+              log(`  ${address}`)
             }
             cb && cb()
           })
@@ -76,14 +80,14 @@ class AppPinner extends EventEmitter {
       ) {
         try {
           const ipnsPath = `/ipns/${this.backplaneId}`
-          console.log('Resolving', ipnsPath)
+          log('Resolving', ipnsPath)
           const name = await this.backplaneIpfs.resolve(ipnsPath)
-          console.log('Resolved IPNS:', name)
+          log('Resolved IPNS:', name)
           const hash = name.replace('/ipfs/', '')
-          console.log('Loading docIndex from IPFS', hash)
+          log('Loading docIndex from IPFS', hash)
           const result = await this.backplaneIpfs.dag.get(hash)
           this.docIndex = result.value
-          console.log('docIndex loaded')
+          log('docIndex loaded')
         } catch (e) {
           console.error('Exception during IPNS resolve', e)
           process.exit(1)
@@ -96,25 +100,25 @@ class AppPinner extends EventEmitter {
         this.docIndex = {}
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
-        console.log('DocIndex CID (blank):', cidBase58)
+        log('DocIndex CID (blank):', cidBase58)
         const start = Date.now()
         try {
           const ipfsPath = `/ipfs/${cidBase58}`
           const name = await this.backplaneIpfs.name.publish(ipfsPath)
           const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
           const ipnsPath = `/ipns/${this.backplaneId}`
-          console.log('IPNS updated:', ipnsPath, elapsed)
+          log('IPNS updated:', ipnsPath, elapsed)
         } catch (e) {
           console.error('IPNS Exception:', e)
         }
-        console.log('\nRemove INIT_IPNS, and set LOAD_FROM_IPNS=true')
-        console.log('and restart to continue')
+        log('\nRemove INIT_IPNS, and set LOAD_FROM_IPNS=true')
+        log('and restart to continue')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
       } else {
-        console.log('\nFirst, set INIT_IPNS=true to create empty index on IPNS,')
-        console.log('and then set LOAD_FROM_IPNS=true to load it.')
+        log('\nFirst, set INIT_IPNS=true to create empty index on IPNS,')
+        log('and then set LOAD_FROM_IPNS=true to load it.')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
@@ -137,7 +141,7 @@ class AppPinner extends EventEmitter {
     })
     .then(() => {
       this._peerCountGuess.start()
-      console.log('pinner for %j started', this.name)
+      log(`pinner for ${this.name} started`)
       setTimeout(() => {
         this.ipfs.swarm.connect(
           `/ip4/127.0.0.1/tcp/24001/ipfs/${this.backplaneId}`
@@ -208,7 +212,7 @@ class AppPinner extends EventEmitter {
     try {
       [collaborationName, membership, type] = decode(message.data)
     } catch (err) {
-      console.log('error parsing gossip message:', err)
+      log('error parsing gossip message:', err)
       return
     }
 
@@ -217,7 +221,7 @@ class AppPinner extends EventEmitter {
       collaboration = this._collaborations.get(collaborationName)
     } else {
       debug('new collaboration %s of type %s', collaborationName, type)
-      console.log('New:', collaborationName)
+      log('New:', collaborationName)
       if (type) {
         collaboration = this._addCollaboration(collaborationName, type)
         await collaboration.start()
@@ -262,7 +266,7 @@ class AppPinner extends EventEmitter {
 
     const onInactivityTimeout = () => {
       debug('collaboration %j timed out. Removing it...', name, type)
-      console.log('Timed out:', name)
+      log('Timed out:', name)
       collaboration.removeListener('state changed', onStateChanged)
       this._collaborations.delete(name)
 
@@ -297,7 +301,10 @@ class AppPinner extends EventEmitter {
 
       // console.log('Jim changed pinner state as delta', delta)
       backup += `${fqn} ${encode(delta).toString('base64')}\n`
-      console.log('Saving state:', fqn, clock)
+      log('Saving state:', fqn)
+      Object.keys(clock).sort().forEach(key => {
+        log(`  ${key}: ${clock[key]}`)
+      })
 
       const opts = { 'cid-version': 1 }
       const res = await this.backplaneIpfs.add(encode(delta), opts)
@@ -331,15 +338,15 @@ class AppPinner extends EventEmitter {
       // console.log('Jim docIndex', this.docIndex)
       this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
       const cidBase58 = this.indexCid.toBaseEncodedString()
-      console.log('DocIndex CID (updated):', cidBase58)
+      log('DocIndex CID (updated):', cidBase58)
       const ipfsPath = `/ipfs/${cidBase58}`
-      console.log('Updating IPNS...', ipfsPath)
+      log('Updating IPNS...', ipfsPath)
       const start = Date.now()
       try {
         const name = await this.backplaneIpfs.name.publish(ipfsPath)
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
         const ipnsPath = `/ipns/${this.backplaneId}`
-        console.log('IPNS updated:', ipnsPath, elapsed)
+        log('IPNS updated:', ipnsPath, elapsed)
       } catch (e) {
         console.error('IPNS Exception:', e)
       }

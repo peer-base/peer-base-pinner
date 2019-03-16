@@ -17,12 +17,16 @@ module.exports = (pinner) => {
     const numberOfCollabs = pinner._collaborations.size
     metrics.totalCollaborations.set(numberOfCollabs)
     if (!pinner.ipfs) return
-    pinner.ipfs.swarm.peers((err, peers) => {
-      if (err) {
-        throw err
-      }
-      metrics.totalConnectedPeers.set(peers.length)
-    })
+    try {
+      pinner.ipfs.swarm.peers((err, peers) => {
+        if (err) {
+          throw err
+        }
+        metrics.totalConnectedPeers.set(peers.length)
+      })
+    } catch (e) {
+      console.error('metrics exception:', e)
+    }
   }, REFRESH_INTERVAL)
 
   // const dialsSuccessTotal = new client.Counter({ name: 'rendezvous_dials_total_success', help: 'sucessfully completed dials since server started' })

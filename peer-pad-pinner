@@ -16,14 +16,18 @@ const createPinner = require('./index')
 
 const options = {}
 
+function log (...args) {
+  console.log('pinner:', ...args)
+}
+
 if (config.swarmAddress) {
-  console.log('using swarm address %j', config.swarmAddress)
+  log('using swarm address', config.swarmAddress)
   options.ipfs = {
     swarm: [config.swarmAddress]
   }
 }
 
-console.log('pinning app %s', config.name)
+log('pinning app', config.name)
 
 process.on('unhandledRejection', (err) => {
   console.error(err)
@@ -34,7 +38,7 @@ const pinner = createPinner(config.name, options)
 setInterval(() => {}, 24 * 60 * 60 * 1000) // Keep pinner alive during startup
 pinner.start().then(() => {
   pinner.peerId().then(id => {
-    console.log('Pinner Peer Id:', id)
+    log('Pinner Peer Id:', id)
   })
 })
 startHealthEndpointServer().catch((err) => {
@@ -58,7 +62,7 @@ function startHealthEndpointServer () {
       }
     })
     server.listen({ port, host }, () => {
-      console.log('Health endpoint listening on port', port)
+      log('Health endpoint listening on port', port)
       started = true
       resolve()
     })

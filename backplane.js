@@ -13,6 +13,10 @@ require('dotenv').config()
 const IPFS_BIN = './node_modules/@jimpick/go-ipfs-dep/go-ipfs/ipfs'
 const repoDir = path.resolve(process.cwd(), 'ipfs-repo')
 
+function log (...args) {
+  console.log('pinner backplane:', ...args)
+}
+
 function checkEnv (key, message) {
   if (!process.env[key]) {
     console.error(`Need ${key} in environment`)
@@ -45,11 +49,11 @@ async function create () {
 
 const ready = async function () {
   if (!fs.existsSync(repoDir)) {
-    console.log('Create IPFS repo')
+    log('Create IPFS repo')
     await create()
   }
 
-  console.log('Run IPFS')
+  log('Run IPFS')
   await new Promise((resolve, reject) => {
     const ipfsProcess = spawn(IPFS_BIN, [ 'daemon' ], {
       env: { 'IPFS_PATH': repoDir }
