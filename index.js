@@ -72,6 +72,30 @@ class AppPinner extends EventEmitter {
         })
       })
     })
+    .then(() => {
+      // Try to connect to custom bootstrap servers in a loop
+      const interval = 60 * 1000
+      const connect = this.backplaneIpfs.swarm.connect
+      function connector (addr) {
+        return async () => {
+          try {
+            log(`connecting to ${addr} ...`)
+            const res = await connect(addr)
+            log(`connected to ${addr}`)
+            log(res)
+          } catch (e) {
+            log(`failed connect to ${addr}`, e)
+          }
+        }
+      }
+      for (let i = 1; i <= 3; i++) {
+        const addr = process.env[`BOOTSTRAP${i}`]
+        if (addr) {
+          connector(addr)()
+          setInterval(connector(addr), interval)
+        }
+      }
+    })
     .then(async () => {
       if (
         process.env.LOAD_FROM_IPNS &&
@@ -147,19 +171,6 @@ class AppPinner extends EventEmitter {
           `/ip4/127.0.0.1/tcp/24001/ipfs/${this.backplaneId}`
         )
       }, 10000) // FIXME: Need something more reliable
-
-      // Try to connect to custom bootstrap servers in a loop
-      const interval = 60 * 1000
-      const connect = this.backplaneIpfs.swarm.connect
-      if (process.env.BOOTSTRAP1) {
-        setInterval(() => connect(process.env.BOOTSTRAP1), interval)
-      }
-      if (process.env.BOOTSTRAP2) {
-        setInterval(() => connect(process.env.BOOTSTRAP2), interval)
-      }
-      if (process.env.BOOTSTRAP3) {
-        setInterval(() => connect(process.env.BOOTSTRAP3), interval)
-      }
     })
 
     return this._starting
