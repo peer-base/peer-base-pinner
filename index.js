@@ -15,6 +15,7 @@ const backplane = require('./backplane')
 
 const defaultOptions = {
   collaborationInactivityTimeoutMS: 2 * 60 * 1000
+  // collaborationInactivityTimeoutMS: 30 * 1000
 }
 
 function log (...args) {
@@ -50,7 +51,7 @@ class AppPinner extends EventEmitter {
         const getIdAndAddresses = cb => {
           this.backplaneIpfs.id((err, identity) => {
             if (err) {
-              console.error('Error', err)
+              log('Error', err)
               return cb && cb(err)
             }
             this.backplaneId = identity.id
@@ -82,7 +83,6 @@ class AppPinner extends EventEmitter {
             log(`connecting to ${addr} ...`)
             const res = await connect(addr)
             log(`connected to ${addr}`)
-            log(res)
           } catch (e) {
             log(`failed connect to ${addr}`, e)
           }
@@ -117,9 +117,9 @@ class AppPinner extends EventEmitter {
           this.docIndex = result.value
           log('docIndex loaded', elapsed)
           log('republishing to IPNS to refresh')
-          await this.publish(hash)
+          this.publish(hash)
         } catch (e) {
-          console.error('Exception during IPNS resolve', e)
+          log('Exception during IPNS resolve', e)
           process.exit(1)
         }
       } else if (
@@ -234,24 +234,11 @@ class AppPinner extends EventEmitter {
         collaboration = this._addCollaboration(collaborationName, type)
         await collaboration.start()
         this.emit('collaboration started', collaboration)
-        try {
-          const backup = fs.readFileSync('./backup.txt', 'utf8')
-          for (let line of backup.split('\n')) {
-            if (line.startsWith(collaborationName + ' ')) {
-              const encodedDelta = line.slice(collaborationName.length + 1)
-              const delta = decode(Buffer.from(encodedDelta, 'base64'))
-              // console.log(delta)
-              collaboration.shared.apply(delta)
-            }
-          }
-        } catch (e) {
-          console.error('Exception:', e)
-        }
-        // console.log('Jim new collab pinner state as delta', collaboration.shared.stateAsDelta())
+        this.loadBackupsFromIpfs(collaborationName)
       }
     }
     collaboration.deliverRemoteMembership(membership).catch((err) => {
-      console.error('error delivering remote membership:', err)
+      log('error delivering remote membership:', err)
     })
   }
 
@@ -283,7 +270,7 @@ class AppPinner extends EventEmitter {
           this.emit('collaboration stopped', collaboration)
         })
         .catch((err) => {
-          console.error('error stopping collaboration ' + name + ':', err)
+          log('error stopping collaboration ' + name + ':', err)
         })
     }
 
@@ -307,16 +294,24 @@ class AppPinner extends EventEmitter {
       const delta = collaboration.shared.stateAsDelta()
       const clock = delta[1]
 
-      // console.log('Jim changed pinner state as delta', delta)
-      backup += `${fqn} ${encode(delta).toString('base64')}\n`
       log('Saving state:', fqn)
       Object.keys(clock).sort().forEach(key => {
         log(`  ${key}: ${clock[key]}`)
       })
 
       const opts = { 'cid-version': 1 }
-      const res = await this.backplaneIpfs.add(encode(delta), opts)
+      const encoded = encode(delta)
+      // log('Write main:', encoded)
+      const res = await this.backplaneIpfs.add(encoded, opts)
       if (res.length !== 1) throw new Error('Expected length 1')
+      /*
+      try {
+        log('Test decode:', res[0].hash, decode(encoded))
+        log('Encoded length:', encoded.length)
+      } catch (e) {
+        log('Test decode failed:', e)
+      }
+      */
       const mainCid = new CID(res[0].hash)
       this.docIndex[fqn] = {
         main: mainCid,
@@ -328,27 +323,20 @@ class AppPinner extends EventEmitter {
       for (let name of collaboration._subs.keys()) {
         const sub = collaboration._subs.get(name)
         const subDelta = sub.shared.stateAsDelta()
-        const res = await this.backplaneIpfs.add(encode(subDelta), opts)
+        const encoded = encode(subDelta)
+        const res = await this.backplaneIpfs.add(encoded, opts)
         if (res.length !== 1) throw new Error('Expected length 1')
         const cid = new CID(res[0].hash)
-        this.docIndex[fqn].subs[name] = cid
-
-        // console.log(` Sub ${name}:`, subDelta)
-        backup += `${fqn}:${name} ${encode(subDelta).toString('base64')}\n`
+        this.docIndex[fqn].subs[name] = {
+          type: sub.typeName,
+          cid
+        }
       }
-      fs.writeFileSync('./backup.txt', backup)
-      /*
-      console.log(
-        'Saved main delta to IPFS:',
-        mainCid.toBaseEncodedString('base32')
-      )
-      */
-      // console.log('Jim docIndex', this.docIndex)
       this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
       const cidBase58 = this.indexCid.toBaseEncodedString()
       log('DocIndex CID (updated):', cidBase58)
+      resetActivityTimeout()
       await this.publish(cidBase58)
-
       resetActivityTimeout()
     }
 
@@ -362,7 +350,7 @@ class AppPinner extends EventEmitter {
   }
 
   _handleIPFSError (err) {
-    console.error(err)
+    log(err)
   }
 
   async stop () {
@@ -372,7 +360,7 @@ class AppPinner extends EventEmitter {
           .map(collaboration => collaboration.stop())
       )
     } catch (err) {
-      console.error('error stopping collaborations:', err)
+      log('error stopping collaborations:', err)
     }
 
     if (this._gossip) {
@@ -393,7 +381,46 @@ class AppPinner extends EventEmitter {
       const ipnsPath = `/ipns/${this.backplaneId}`
       log('IPNS updated:', ipnsPath, elapsed)
     } catch (e) {
-      console.error('IPNS Exception:', e)
+      log('IPNS Exception:', e)
+    }
+  }
+
+  async loadBackupsFromIpfs (name) {
+    const doc = this.docIndex[name]
+    // FIXME: Check vector clock and skip if already applied
+    if (doc) {
+      const collaboration = this._collaborations.get(name)
+      const get = this.backplaneIpfs.get
+      try {
+        log(`Retrieving backups for`, name)
+        // log('Main cid:', doc.main.toBaseEncodedString())
+        const res = await get(doc.main)
+        if (res.length !== 1) throw new Error('Expected length 1')
+        // log('Read main:', res[0])
+        // log('Main encoded length:', res[0].content.length)
+        const delta = decode(res[0].content)
+        collaboration.shared.apply(delta)
+        for (const subName in doc.subs) {
+          const subType = doc.subs[subName].type
+          const subCid = doc.subs[subName].cid
+          const sub = await collaboration.sub(subName, subType)
+          // log('Sub cid:', subName, subType, subCid.toBaseEncodedString())
+          const res = await get(subCid)
+          if (res.length !== 1) throw new Error('Expected length 1')
+          const delta = decode(res[0].content)
+          sub.shared.apply(delta)
+        }
+        log(`Backups loaded for`, name)
+        // console.log(delta)
+        /*
+        const encodedDelta = line.slice(collaborationName.length + 1)
+        const delta = decode(Buffer.from(encodedDelta, 'base64'))
+        // console.log(delta)
+        collaboration.shared.apply(delta)
+        */
+      } catch (e) {
+        log('Load Backup Exception:', e)
+      }
     }
   }
 }
