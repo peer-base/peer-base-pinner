@@ -8,7 +8,7 @@
     "peer-pad-pinner": "./peer-pad-pinner"
   },
   "scripts": {
-    "start": "node --optimize_for_size --max_old_space_size=460 ./peer-pad-pinner"
+    "start": "node --optimize_for_size --max_old_space_size=360 ./peer-pad-pinner"
   },
   "repository": {
     "type": "git",
