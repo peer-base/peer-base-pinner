@@ -15,7 +15,7 @@ const backplane = require('./backplane')
 const cluster = require('./ipfs-cluster-api')
 
 const defaultOptions = {
-  collaborationInactivityTimeoutMS: 2 * 60 * 1000
+  collaborationInactivityTimeoutMS: 5 * 60 * 1000
   // collaborationInactivityTimeoutMS: 30 * 1000
 }
 
@@ -352,7 +352,7 @@ class AppPinner extends EventEmitter {
       }
     }
 
-    const debouncedOnStateChanged = debounce(onStateChanged, 500)
+    const debouncedOnStateChanged = debounce(onStateChanged, 10 * 1000)
 
     collaboration.on('state changed', debouncedOnStateChanged)
 
