@@ -22,11 +22,12 @@
   },
   "homepage": "https://github.com/ipfs-shipyard/peer-base-pinner#readme",
   "dependencies": {
+    "@jimpick/go-ipfs-dep": "0.4.19-2",
     "cids": "^0.5.7",
     "delay": "^4.1.0",
     "dotenv": "^7.0.0",
-    "@jimpick/go-ipfs-dep": "0.4.19-2",
     "ipfs-http-client": "^30.0.0",
+    "isomorphic-fetch": "^2.2.1",
     "lodash.debounce": "^4.0.8",
     "peer-base": "^0.12.0-rc6",
     "tempy": "^0.2.1"

@@ -12,6 +12,7 @@ const CID = require('cids')
 const debounce = require('lodash.debounce')
 const delay = require('delay')
 const backplane = require('./backplane')
+const cluster = require('./ipfs-cluster-api')
 
 const defaultOptions = {
   collaborationInactivityTimeoutMS: 2 * 60 * 1000
@@ -38,6 +39,7 @@ class AppPinner extends EventEmitter {
     this._starting = null
 
     this._onGossipMessage = this._onGossipMessage.bind(this)
+    this.lastCid = null
   }
 
   start () {
@@ -116,6 +118,7 @@ class AppPinner extends EventEmitter {
           elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
           this.docIndex = result.value
           log('docIndex loaded', elapsed)
+          this.lastCid = hash
           log('republishing to IPNS to refresh')
           this.publish(hash)
         } catch (e) {
@@ -289,55 +292,64 @@ class AppPinner extends EventEmitter {
     const onStateChanged = async () => {
       debug('state changed in collaboration %s', name)
 
-      const fqn = collaboration.fqn()
-      let backup = ''
-      const delta = collaboration.shared.stateAsDelta()
-      const clock = delta[1]
-
-      log('Saving state:', fqn)
-      Object.keys(clock).sort().forEach(key => {
-        log(`  ${key}: ${clock[key]}`)
-      })
-
-      const opts = { 'cid-version': 1 }
-      const encoded = encode(delta)
-      // log('Write main:', encoded)
-      const res = await this.backplaneIpfs.add(encoded, opts)
-      if (res.length !== 1) throw new Error('Expected length 1')
-      /*
       try {
-        log('Test decode:', res[0].hash, decode(encoded))
-        log('Encoded length:', encoded.length)
-      } catch (e) {
-        log('Test decode failed:', e)
-      }
-      */
-      const mainCid = new CID(res[0].hash)
-      this.docIndex[fqn] = {
-        main: mainCid,
-        clock,
-        date: Date.now(),
-        subs: {}
-      }
+        const fqn = collaboration.fqn()
+        const delta = collaboration.shared.stateAsDelta()
+        const clock = delta[1]
 
-      for (let name of collaboration._subs.keys()) {
-        const sub = collaboration._subs.get(name)
-        const subDelta = sub.shared.stateAsDelta()
-        const encoded = encode(subDelta)
+        log('Saving state:', fqn)
+        Object.keys(clock).sort().forEach(key => {
+          log(`  ${key}: ${clock[key]}`)
+        })
+
+        const opts = { 'cid-version': 1 }
+        const encoded = encode(delta)
+        // log('Write main:', encoded)
         const res = await this.backplaneIpfs.add(encoded, opts)
         if (res.length !== 1) throw new Error('Expected length 1')
-        const cid = new CID(res[0].hash)
-        this.docIndex[fqn].subs[name] = {
-          type: sub.typeName,
-          cid
+        /*
+        try {
+          log('Test decode:', res[0].hash, decode(encoded))
+          log('Encoded length:', encoded.length)
+        } catch (e) {
+          log('Test decode failed:', e)
         }
+        */
+        const mainCid = new CID(res[0].hash)
+        this.docIndex[fqn] = {
+          main: mainCid,
+          clock,
+          date: Date.now(),
+          subs: {}
+        }
+
+        for (let name of collaboration._subs.keys()) {
+          const sub = collaboration._subs.get(name)
+          const subDelta = sub.shared.stateAsDelta()
+          const encoded = encode(subDelta)
+          const res = await this.backplaneIpfs.add(encoded, opts)
+          if (res.length !== 1) throw new Error('Expected length 1')
+          const cid = new CID(res[0].hash)
+          this.docIndex[fqn].subs[name] = {
+            type: sub.typeName,
+            cid
+          }
+        }
+        this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
+        const cidBase58 = this.indexCid.toBaseEncodedString()
+        log('DocIndex CID (updated):', cidBase58)
+        resetActivityTimeout()
+        const prevCid = this.lastCid
+        await cluster.pin(cidBase58)
+        this.lastCid = cidBase58
+        resetActivityTimeout()
+        await this.publish(cidBase58)
+        resetActivityTimeout()
+        await cluster.unpin(prevCid)
+        resetActivityTimeout()
+      } catch (e) {
+        log('Exception during update:', e)
       }
-      this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
-      const cidBase58 = this.indexCid.toBaseEncodedString()
-      log('DocIndex CID (updated):', cidBase58)
-      resetActivityTimeout()
-      await this.publish(cidBase58)
-      resetActivityTimeout()
     }
 
     const debouncedOnStateChanged = debounce(onStateChanged, 500)
@@ -380,6 +392,7 @@ class AppPinner extends EventEmitter {
       const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
       const ipnsPath = `/ipns/${this.backplaneId}`
       log('IPNS updated:', ipnsPath, elapsed)
+      log('  CID:', cidBase58)
     } catch (e) {
       log('IPNS Exception:', e)
     }
