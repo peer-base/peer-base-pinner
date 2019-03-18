@@ -95,9 +95,9 @@ class AppPinner extends EventEmitter {
           }
         }
       }
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 9; i++) {
         const addr = process.env[`BOOTSTRAP${i}`]
-        if (addr) {
+        if (addr && !addr.match(/p2p-circuit/)) {
           connector(addr)()
           setInterval(connector(addr), interval)
         }
