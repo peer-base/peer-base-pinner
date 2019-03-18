@@ -23,6 +23,11 @@ function log (...args) {
   console.log('pinner:', ...args)
 }
 
+function logConnection (...args) {
+  console.log('pinner cnxn:', ...args)
+}
+
+
 class AppPinner extends EventEmitter {
   constructor (name, options) {
     super()
@@ -53,15 +58,15 @@ class AppPinner extends EventEmitter {
         const getIdAndAddresses = cb => {
           this.backplaneIpfs.id((err, identity) => {
             if (err) {
-              log('Error', err)
+              logConnection('Error', err)
               return cb && cb(err)
             }
             this.backplaneId = identity.id
             this.backplaneAddresses = identity.addresses
-            log('Backplane Peer Id:', this.backplaneId)
-            log('Backplane Peer Addresses:')
+            logConnection('Backplane Peer Id:', this.backplaneId)
+            logConnection('Backplane Peer Addresses:')
             for (const address of this.backplaneAddresses) {
-              log(`  ${address}`)
+              logConnection(`  ${address}`)
             }
             cb && cb()
           })
@@ -82,11 +87,11 @@ class AppPinner extends EventEmitter {
       function connector (addr) {
         return async () => {
           try {
-            log(`connecting to ${addr} ...`)
+            logConnection(`connecting to ${addr} ...`)
             const res = await connect(addr)
-            log(`connected to ${addr}`)
+            logConnection(`connected to ${addr}`)
           } catch (e) {
-            log(`failed connect to ${addr}`, e)
+            logConnection(`failed connect to ${addr}`, e)
           }
         }
       }
