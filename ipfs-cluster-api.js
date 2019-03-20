@@ -1,8 +1,7 @@
 const delay = require('delay')
 require('isomorphic-fetch')
 
-const apiBase = process.env.IPFS_CLUSTER_API
-const apiBaseUrl = new URL(apiBase)
+let apiBase = process.env.IPFS_CLUSTER_API
 
 const user = process.env.IPFS_CLUSTER_USER
 const pw = process.env.IPFS_CLUSTER_PASSWORD
@@ -12,8 +11,17 @@ function log (...args) {
   console.log('pinner cluster api:', ...args)
 }
 
+function useTunnel () {
+  // Override when using libp2p tunnel
+  apiBase = 'http://127.0.0.1:29097'
+}
+
 async function pin (cid) {
-  const name = 'peer-base-pinner'
+  const apiBaseUrl = new URL(apiBase)
+  let name = 'peer-base-pinner'
+  if (process.env.IPFS_CLUSTER_LABEL) {
+    name += `: ${process.env.IPFS_CLUSTER_LABEL}`
+  }
   const opts = `name=${encodeURIComponent(name)}`
   const apiPinAdd = new URL(`/pins/${cid}?${opts}`, apiBaseUrl)
   log(`pinning ${cid} to cluster`)
@@ -28,6 +36,7 @@ async function pin (cid) {
     }
   )
   if (!res.ok) {
+    log('Error:', res.status, res.statusText)
     throw new Error('Pin add failed')
   }
   const apiPinStatus = new URL(`/pins/${cid}`, apiBaseUrl)
@@ -66,7 +75,7 @@ async function pin (cid) {
       }
       const notPinning = Object.keys(json.peer_map).some(peerId => {
         const peer = json.peer_map[peerId]
-        return peer.status !== 'pinning'
+        return peer.status !== 'pinning' && peer.status !== 'remote' 
       })
       if (notPinning) {
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
@@ -80,6 +89,7 @@ async function pin (cid) {
 }
 
 async function unpin (cid) {
+  const apiBaseUrl = new URL(apiBase)
   const apiPinRm = new URL(`/pins/${cid}`, apiBaseUrl)
   log(`unpinning ${cid} from cluster`)
   const res = await fetch(
@@ -97,6 +107,7 @@ async function unpin (cid) {
 }
 
 module.exports = {
+  useTunnel,
   pin,
   unpin
 }

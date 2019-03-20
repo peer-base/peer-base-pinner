@@ -27,7 +27,6 @@ function logConnection (...args) {
   console.log('pinner cnxn:', ...args)
 }
 
-
 class AppPinner extends EventEmitter {
   constructor (name, options) {
     super()
@@ -79,6 +78,23 @@ class AppPinner extends EventEmitter {
           resolve()
         })
       })
+    })
+    .then(async () => {
+      // If connecting to ipfs-cluster via libp2p, setup a p2p tunnel
+      // See: https://github.com/ipfs-shipyard/peer-base-pinner/issues/5
+      const apiAddr = process.env.IPFS_CLUSTER_API
+      const match = apiAddr.match(/^\/ip[46]\/[^/]+\/tcp\/\d+\/ipfs\/([^/]+)$/)
+      if (match) {
+        // swarm connect
+        const clusterPeerId = match[1]
+        const connect = this.backplaneIpfs.swarm.connect
+        log(`connecting to ipfs-cluster via ${apiAddr} ...`)
+        const res = await connect(apiAddr)
+        log('connected')
+        log('configuring libp2p tunnel to ipfs-cluster')
+        await backplane.tunnel(clusterPeerId)
+        cluster.useTunnel()
+      }
     })
     .then(() => {
       // Try to connect to custom bootstrap servers in a loop
