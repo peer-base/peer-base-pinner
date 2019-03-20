@@ -28,6 +28,10 @@ function logConnection (...args) {
   console.log('pinner cnxn:', ...args)
 }
 
+function logCollab (...args) {
+  console.log('pinner collab:', ...args)
+}
+
 class AppPinner extends EventEmitter {
   constructor (name, options) {
     super()
@@ -254,7 +258,7 @@ class AppPinner extends EventEmitter {
       collaboration = this._collaborations.get(collaborationName)
     } else {
       debug('new collaboration %s of type %s', collaborationName, type)
-      log('New:', collaborationName)
+      logCollab('New:', collaborationName)
       if (type) {
         collaboration = this._addCollaboration(collaborationName, type)
         await collaboration.start()
@@ -286,7 +290,7 @@ class AppPinner extends EventEmitter {
 
     const onInactivityTimeout = () => {
       debug('collaboration %j timed out. Removing it...', name, type)
-      log('Timed out:', name)
+      logCollab('Timed out:', name)
       collaboration.removeListener('state changed', onStateChanged)
       this._collaborations.delete(name)
 
@@ -449,7 +453,7 @@ class AppPinner extends EventEmitter {
       const collaboration = this._collaborations.get(name)
       const get = this.backplaneIpfs.get
       try {
-        log(`Retrieving backups for`, name)
+        logCollab(`Retrieving backups for`, name)
         // log('Main cid:', doc.main.toBaseEncodedString())
         const res = await get(doc.main)
         if (res.length !== 1) throw new Error('Expected length 1')
@@ -467,7 +471,7 @@ class AppPinner extends EventEmitter {
           const delta = decode(res[0].content)
           sub.shared.apply(delta)
         }
-        log(`Backups loaded for`, name)
+        logCollab(`Backups loaded for`, name)
         // console.log(delta)
         /*
         const encodedDelta = line.slice(collaborationName.length + 1)
@@ -476,7 +480,7 @@ class AppPinner extends EventEmitter {
         collaboration.shared.apply(delta)
         */
       } catch (e) {
-        log('Load Backup Exception:', e)
+        logCollab('Load Backup Exception:', e)
       }
     }
   }
