@@ -11,6 +11,7 @@ const { decode, encode } = require('delta-crdts-msgpack-codec')
 const CID = require('cids')
 const debounce = require('lodash.debounce')
 const delay = require('delay')
+const PQueue = require('p-queue')
 const backplane = require('./backplane')
 const cluster = require('./ipfs-cluster-api')
 
@@ -141,7 +142,7 @@ class AppPinner extends EventEmitter {
           log('docIndex loaded', elapsed)
           this.lastCid = hash
           log('republishing to IPNS to refresh')
-          this.publish(hash)
+          this.pinAndPublish(hash)
         } catch (e) {
           log('Exception during IPNS resolve', e)
           process.exit(1)
@@ -359,14 +360,7 @@ class AppPinner extends EventEmitter {
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (updated):', cidBase58)
-        resetActivityTimeout()
-        const prevCid = this.lastCid
-        await cluster.pin(cidBase58)
-        this.lastCid = cidBase58
-        resetActivityTimeout()
-        await this.publish(cidBase58)
-        resetActivityTimeout()
-        await cluster.unpin(prevCid)
+        this.pinAndPublish(cidBase58)
         resetActivityTimeout()
       } catch (e) {
         log('Exception during update:', e)
@@ -402,6 +396,35 @@ class AppPinner extends EventEmitter {
     this._collaborations.clear()
     this._peerCountGuess.stop()
     await this.ipfs.stop()
+  }
+
+  async pinAndPublish (cidBase58) {
+    this.pendingCid = cidBase58
+    log('Queued', this.pendingCid)
+    if (!this.queue) {
+      this.queue = new PQueue({concurrency: 1})
+    }
+    this.queue.add(() => this.pinAndPublishWorker())
+  }
+
+  async pinAndPublishWorker () {
+    const cidBase58 = this.pendingCid
+    if (!cidBase58) return
+    log('Pinning and publishing', cidBase58)
+    this.pendingCid = null
+    const prevCid = this.lastPinnedCid
+    if (cidBase58 !== this.lastPinnedCid) {
+      await cluster.pin(cidBase58)
+      this.lastPinnedCid = cidBase58
+    }
+    if (cidBase58 !== this.lastPublishedCid) {
+      await this.publish(cidBase58)
+      this.lastPublishedCid = cidBase58
+    }
+    if (prevCid && prevCid !== cidBase58) {
+      await cluster.unpin(prevCid)
+    }
+    log('Pinned and published', cidBase58)
   }
 
   async publish (cidBase58) {
