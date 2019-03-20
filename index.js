@@ -122,9 +122,8 @@ class AppPinner extends EventEmitter {
     })
     .then(async () => {
       if (
-        process.env.LOAD_FROM_IPNS &&
-        process.env.LOAD_FROM_IPNS != '0' &&
-        process.env.LOAD_FROM_IPNS.toLowerCase() != 'false'
+        process.env.IPNS_MODE &&
+        process.env.IPNS_MODE.toLowerCase() == 'load'
       ) {
         try {
           const ipnsPath = `/ipns/${this.backplaneId}`
@@ -148,23 +147,22 @@ class AppPinner extends EventEmitter {
           process.exit(1)
         }
       } else if (
-        process.env.INIT_IPNS &&
-        process.env.INIT_IPNS != '0' &&
-        process.env.INIT_IPNS.toLowerCase() != 'false'
+        process.env.IPNS_MODE &&
+        process.env.IPNS_MODE.toLowerCase() == 'init'
       ) {
         this.docIndex = {}
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (blank):', cidBase58)
         await this.publish(cidBase58)
-        log('\nRemove INIT_IPNS, and set LOAD_FROM_IPNS=true')
+        log('\nSet IPNS_MODE=load')
         log('and restart to continue')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
       } else {
-        log('\nFirst, set INIT_IPNS=true to create empty index on IPNS,')
-        log('and then set LOAD_FROM_IPNS=true to load it.')
+        log('\nFirst, set IPNS_MODE=init to create empty index on IPNS,')
+        log('and then set IPNS_MODE=load to load it.')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
