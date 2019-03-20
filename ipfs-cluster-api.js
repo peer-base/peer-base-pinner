@@ -7,6 +7,8 @@ const user = process.env.IPFS_CLUSTER_USER
 const pw = process.env.IPFS_CLUSTER_PASSWORD
 const auth = Buffer.from(`${user}:${pw}`).toString('base64')
 
+const pinningTimeout = 5 * 60 * 1000 // Give up after 5 minutes
+
 function log (...args) {
   console.log('pinner cluster api:', ...args)
 }
@@ -81,7 +83,8 @@ async function pin (cid) {
           peer.status !== 'unpinned'
         )
       })
-      if (notPinning) {
+      const timedOut = Date.now() > start + pinningTimeout
+      if (notPinning || timedOut) {
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
         log('Aborting ipfs-cluster pin', elapsed)
         log(JSON.stringify(json, null, 2))
