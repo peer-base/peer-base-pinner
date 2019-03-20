@@ -75,7 +75,11 @@ async function pin (cid) {
       }
       const notPinning = Object.keys(json.peer_map).some(peerId => {
         const peer = json.peer_map[peerId]
-        return peer.status !== 'pinning' && peer.status !== 'remote' 
+        return (
+          peer.status !== 'pinning' &&
+          peer.status !== 'remote' &&
+          peer.status !== 'unpinned'
+        )
       })
       if (notPinning) {
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
