@@ -84,6 +84,7 @@ async function pin (cid) {
         )
       })
       const timedOut = Date.now() > start + pinningTimeout
+      if (timedOut) log('Timed out')
       if (notPinning || timedOut) {
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
         log('Aborting ipfs-cluster pin', elapsed)
