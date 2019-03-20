@@ -68,7 +68,7 @@
   },
   "Experimental": {
     "FilestoreEnabled": false,
-    "Libp2pStreamMounting": false,
+    "Libp2pStreamMounting": true,
     "P2pHttpProxy": false,
     "QUIC": false,
     "ShardingEnabled": false,

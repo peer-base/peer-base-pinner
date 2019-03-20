@@ -75,8 +75,24 @@ const ready = async function () {
   return ipfs
 }()
 
+async function tunnel (clusterPeerId) {
+  const { stdout } = await execFile(
+    IPFS_BIN, [
+      'p2p',
+      'forward',
+      '--allow-custom-protocol',
+      '/libp2p-http',
+      `/ip4/127.0.0.1/tcp/29097`,
+      `/ipfs/${clusterPeerId}`
+    ],
+    { env: { 'IPFS_PATH': repoDir } }
+  )
+  log(stdout)
+}
+
 module.exports = {
-  ready
+  ready,
+  tunnel
 }
 
 
