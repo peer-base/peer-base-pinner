@@ -78,7 +78,8 @@ async function pin (cid) {
         return (
           peer.status !== 'pinning' &&
           peer.status !== 'remote' &&
-          peer.status !== 'unpinned'
+          peer.status !== 'unpinned' &&
+          peer.status !== 'pin_error'
         )
       })
       if (notPinning) {
