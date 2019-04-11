@@ -82,7 +82,8 @@ async function pin (cid) {
           peer.status !== 'remote' &&
           peer.status !== 'unpinned' &&
           peer.status !== 'pin_error' &&
-          peer.status !== 'pin_queued'
+          peer.status !== 'pin_queued' &&
+          peer.status !== 'cluster_error'
         )
       })
       const timedOut = Date.now() > start + pinningTimeout
