@@ -132,7 +132,7 @@
     "DisableNatPortMap": false,
     "DisableRelay": false,
     "EnableAutoNATService": false,
-    "EnableAutoRelay": true,
+    "EnableAutoRelay": false,
     "EnableRelayHop": false
   }
 }

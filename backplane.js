@@ -37,6 +37,13 @@ async function create () {
       configTemplate.Bootstrap.push(bootstrap)
     }
   }
+  if (process.env.WEBSOCKET_ANNOUNCE_HOST) {
+    const port = process.env.PORT || 3001
+    configTemplate.Addresses.Announce.push(
+      `/dns4/${process.env.WEBSOCKET_ANNOUNCE_HOST}/tcp/${port}/ws`
+    )
+    configTemplate.Addresses.Swarm.push('/ip4/0.0.0.0/tcp/24002/ws')
+  }
   fs.writeFileSync(generatedConfig, JSON.stringify(configTemplate, null, 2))
   const { stdout } = await execFile(
     IPFS_BIN, [ 'init', generatedConfig ],

@@ -5,6 +5,10 @@ A pinner for peer-base ... backup collaborations using IPFS, IPLD, IPNS + ipfs-c
 ```bash
 $ IPFS_HOME=/tmp/peer-base-pinner ipfs init
 $ cat << EOF > .env
+# Expose a websocket proxy (optional)
+WEBSOCKET_ANNOUNCE_HOST=my-peer-base-pinner.herokuapp.com
+## Starts a proxy and listens on /dns4/<host>/tcp/3001/ws/ipfs/<backplane-peer-id>
+
 # The IPFS cluster
 BOOTSTRAP1=/dns4/example.com/tcp/9097/ipfs/QmXXX
 
