@@ -71,7 +71,6 @@ function startHealthEndpointServer () {
       }
     })
     if (process.env.WEBSOCKET_ANNOUNCE_HOST) {
-      console.log('Jim upgrade!')
       server.on('upgrade', onUpgrade)
     }
     server.listen({ port, host }, () => {
@@ -103,6 +102,7 @@ function startHealthEndpointServer () {
   }
 
   function onUpgrade (req, socket, head) {
+    console.log('Jim upgrade!', req, head)
     proxy.ws(req, socket, head)
   }
 
