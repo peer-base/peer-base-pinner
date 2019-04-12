@@ -2,7 +2,12 @@
 /* eslint no-console: "off" */
 'use strict'
 
+const http = require('http')
+const httpProxy = require('http-proxy')
+
 require('dotenv').config()
+
+const createPinner = require('./index')
 
 const defaultName = 'peer-pad/2'
 const defaultSwarmAddress = '/dns4/ws-star1.par.dwebops.pub/tcp/443/wss/p2p-websocket-star'
@@ -12,7 +17,6 @@ const config = {
   swarmAddress: process.env.PEER_BASE_SWARM_ADDRESS || process.env.PEER_STAR_SWARM_ADDRESS || defaultSwarmAddress
 }
 
-const createPinner = require('./index')
 
 const options = {}
 
@@ -49,10 +53,15 @@ startHealthEndpointServer().catch((err) => {
 function startHealthEndpointServer () {
   const metricsRegistry = require('./pinner-metrics')(pinner)
 
+  const proxy = httpProxy.createProxyServer({
+    target: 'http://127.0.0.1:24002/ws',
+    ws: true
+  })
+
   return new Promise((resolve, reject) => {
     let started = false
 
-    const server = require('http').createServer(onRequest)
+    const server = http.createServer(onRequest)
     const port = process.env.PORT || 3001
     const host = process.env.HOST || '0.0.0.0'
 
@@ -61,6 +70,9 @@ function startHealthEndpointServer () {
         reject(err)
       }
     })
+    if (process.env.WEBSOCKET_ANNOUNCE_HOST) {
+      server.on('upgrade', onUpgrade)
+    }
     server.listen({ port, host }, () => {
       log('Health endpoint listening on port', port)
       started = true
@@ -88,4 +100,9 @@ function startHealthEndpointServer () {
         response.end('Not found')
     }
   }
+
+  function onUpgrade (req, socket, head) {
+    proxy.ws(req, socket, head)
+  }
+
 }
