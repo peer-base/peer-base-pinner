@@ -38,7 +38,8 @@ async function create () {
     }
   }
   if (process.env.WEBSOCKET_ANNOUNCE_HOST) {
-    const port = process.env.PORT || 3001
+    const port = process.env.WEBSOCKET_EXTERNAL_PORT || 
+      process.env.PORT || 3001
     configTemplate.Addresses.Announce.push(
       `/dns4/${process.env.WEBSOCKET_ANNOUNCE_HOST}/tcp/${port}/ws`
     )
