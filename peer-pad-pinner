@@ -96,6 +96,7 @@ function startHealthEndpointServer () {
         response.end(metricsRegistry.metrics())
         break
       default:
+        console.error('Jim 404', request.url, request.headers)
         response.writeHead(404)
         response.end('Not found')
     }
