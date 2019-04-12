@@ -54,7 +54,7 @@ function startHealthEndpointServer () {
   const metricsRegistry = require('./pinner-metrics')(pinner)
 
   const proxy = httpProxy.createProxyServer({
-    target: 'http://127.0.0.1:24002/ws',
+    target: 'ws://127.0.0.1:24002',
     ws: true
   })
 
@@ -71,6 +71,7 @@ function startHealthEndpointServer () {
       }
     })
     if (process.env.WEBSOCKET_ANNOUNCE_HOST) {
+      console.log('Jim upgrade!')
       server.on('upgrade', onUpgrade)
     }
     server.listen({ port, host }, () => {
