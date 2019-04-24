@@ -143,6 +143,9 @@ class AppPinner extends EventEmitter {
           elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
           this.docIndex = result.value
           log('docIndex loaded', elapsed)
+          if (!this.docIndex._created && !process.env.FORCE_CREATED) {
+            throw new Error('docIndex issing _created entry')
+          }
           this.lastCid = hash
           log('republishing to IPNS to refresh')
           this.pinAndPublish(hash)
@@ -154,7 +157,9 @@ class AppPinner extends EventEmitter {
         process.env.IPNS_MODE &&
         process.env.IPNS_MODE.toLowerCase() == 'init'
       ) {
-        this.docIndex = {}
+        this.docIndex = {
+          _created: Date.now()
+        }
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (blank):', cidBase58)
@@ -248,6 +253,10 @@ class AppPinner extends EventEmitter {
       [collaborationName, membership, type] = decode(message.data)
     } catch (err) {
       log('error parsing gossip message:', err)
+      return
+    }
+    if (collaborationName.startsWith('_')) {
+      log('forbidden collaboration name: ' + collaborationName)
       return
     }
 
@@ -358,6 +367,9 @@ class AppPinner extends EventEmitter {
             type: sub.typeName,
             cid
           }
+        }
+        if (this.docIndex._created && process.env.FORCE_CREATED) {
+          this.docIndex._created = Date.now()
         }
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
