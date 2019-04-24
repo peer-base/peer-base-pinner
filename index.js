@@ -368,7 +368,7 @@ class AppPinner extends EventEmitter {
             cid
           }
         }
-        if (this.docIndex._created && process.env.FORCE_CREATED) {
+        if (!this.docIndex._created && process.env.FORCE_CREATED) {
           this.docIndex._created = Date.now()
         }
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
