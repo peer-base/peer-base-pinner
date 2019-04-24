@@ -144,7 +144,7 @@ class AppPinner extends EventEmitter {
           this.docIndex = result.value
           log('docIndex loaded', elapsed)
           if (!this.docIndex._created && !process.env.FORCE_CREATED) {
-            throw new Error('docIndex issing _created entry')
+            throw new Error('docIndex missing _created entry')
           }
           this.lastCid = hash
           log('republishing to IPNS to refresh')
