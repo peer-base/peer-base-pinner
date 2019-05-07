@@ -20,8 +20,8 @@ WEBSOCKET_EXTERNAL_PORT=8080
 # The IPFS cluster
 BOOTSTRAP1=/dns4/example.com/tcp/9097/ipfs/QmXXX
 
-# Set IPNS_MODE to init on first run, then load
-IPNS_MODE=init
+# Set STARTUP_MODE to init on first run, then load-from-pinner
+STARTUP_MODE=init
 
 # ipfs-cluster stuff
 IPFS_CLUSTER_API=/dns4/example.com/tcp/9097/ipfs/QmXXX

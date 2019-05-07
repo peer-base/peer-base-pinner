@@ -117,8 +117,28 @@ async function unpin (cid) {
   }
 }
 
+async function getPins () {
+  const apiBaseUrl = new URL(apiBase)
+  const apiPinLs = new URL(`/allocations?filter=all`, apiBaseUrl)
+  log(`listing pins on cluster`)
+  const res = await fetch(
+    apiPinLs.href,
+    {
+      headers: {
+        'Authorization': `Basic ${auth}`
+      }
+    }
+  )
+  if (!res.ok) {
+    throw new Error('Pin ls failed')
+  }
+  const json = await res.json()
+  return json
+}
+
 module.exports = {
   useTunnel,
   pin,
-  unpin
+  unpin,
+  getPins
 }

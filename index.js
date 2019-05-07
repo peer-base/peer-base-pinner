@@ -126,10 +126,30 @@ class AppPinner extends EventEmitter {
     })
     .then(async () => {
       if (
-        process.env.LOAD_FROM
+        process.env.STARTUP_MODE === 'load-from-pinner'
       ) {
         try {
-          const hash = process.env.LOAD_FROM
+          const pins = (await cluster.getPins())
+            .filter(({ name }) => {
+              // peer-base-pinner: 6 QmTpAjVsRTpAAHp25GfLGoKm2zhXekN3EF6uxQmDC9dC5G jim-dev
+              const match = name.match(/^peer-base-pinner: \d+ (\S+)( .*$)?/)
+              if (match && match[1] === this.backplaneId) return true
+            })
+            .map(({ name, cid }) => ({
+              cid,
+              version: Number(name.match(/^peer-base-pinner: (\d+) /)[1])
+            }))
+            .sort((a, b) => a.version - b.version)
+          if (pins.length === 0) {
+            throw new Error('No pins found in pinner to load')
+          }
+          // Load first pin
+          const hash = pins[0].cid
+          // Remove subsequent pins ... they may not have finished pinning
+          for (let i = 1; i < pins.length; i++) {
+            log(`unpinning version ${pins[i].version}, ${pins[i].cid}`)
+            await cluster.unpin(pins[i].cid)
+          }
           log('Loading docIndex from IPFS', hash)
           const start = Date.now()
           const result = await this.backplaneIpfs.dag.get(hash)
@@ -142,7 +162,7 @@ class AppPinner extends EventEmitter {
           log('Exception during initial load', e)
           process.exit(1)
         }
-      } else {
+      } else if (process.env.STARTUP_MODE === 'init') {
         this.docIndex = {
           _created: Date.now(),
           _version: 1
@@ -151,8 +171,14 @@ class AppPinner extends EventEmitter {
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (blank):', cidBase58)
         this.pin(cidBase58)
-        log('\nSet LOAD_FROM=<hash>')
+        log('\nSet STARTUP_MODE=load-from-pinner')
         log('and restart to continue')
+        while (true) {
+          await delay(60 * 1000) // Infinite loop
+        }
+      } else {
+        log('\nFirst, set STARTUP_MODE=init to create empty index on pinner,')
+        log('and then set STARTUP_MODE=load-from-pinner to load it.')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
@@ -418,6 +444,7 @@ class AppPinner extends EventEmitter {
       await cluster.unpin(prevCid)
     }
     log('Pinned', cidBase58)
+    // Delay to prevent pinning too often
     await delay(30000)
   }
 
