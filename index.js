@@ -126,52 +126,59 @@ class AppPinner extends EventEmitter {
     })
     .then(async () => {
       if (
-        process.env.IPNS_MODE &&
-        process.env.IPNS_MODE.toLowerCase() == 'load'
+        process.env.STARTUP_MODE === 'load-from-pinner'
       ) {
         try {
-          const ipnsPath = `/ipns/${this.backplaneId}`
-          log('Resolving', ipnsPath)
-          let start = Date.now()
-          const name = await this.backplaneIpfs.resolve(ipnsPath)
-          let elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-          log('Resolved IPNS:', name, elapsed)
-          const hash = name.replace('/ipfs/', '')
-          log('Loading docIndex from IPFS', hash)
-          start = Date.now()
-          const result = await this.backplaneIpfs.dag.get(hash)
-          elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-          this.docIndex = result.value
-          log('docIndex loaded', elapsed)
-          if (!this.docIndex._created && !process.env.FORCE_CREATED) {
-            throw new Error('docIndex missing _created entry')
+          const pins = (await cluster.getPins())
+            .filter(({ name }) => {
+              // peer-base-pinner: 6 QmTpAjVsRTpAAHp25GfLGoKm2zhXekN3EF6uxQmDC9dC5G jim-dev
+              const match = name.match(/^peer-base-pinner: \d+ (\S+)( .*$)?/)
+              if (match && match[1] === this.backplaneId) return true
+            })
+            .map(({ name, cid }) => ({
+              cid,
+              version: Number(name.match(/^peer-base-pinner: (\d+) /)[1])
+            }))
+            .sort((a, b) => a.version - b.version)
+          if (pins.length === 0) {
+            throw new Error('No pins found in pinner to load')
           }
+          // Load first pin
+          const hash = pins[0].cid
+          // Remove subsequent pins ... they may not have finished pinning
+          for (let i = 1; i < pins.length; i++) {
+            log(`unpinning version ${pins[i].version}, ${pins[i].cid}`)
+            await cluster.unpin(pins[i].cid)
+          }
+          log('Loading docIndex from IPFS', hash)
+          const start = Date.now()
+          const result = await this.backplaneIpfs.dag.get(hash)
+          const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
+          this.docIndex = result.value
+          log(`docIndex loaded ${elapsed}, version ${this.docIndex._version}`)
           this.lastCid = hash
-          log('republishing to IPNS to refresh')
-          this.pinAndPublish(hash)
+          this.lastPinnedCid = hash
         } catch (e) {
-          log('Exception during IPNS resolve', e)
+          log('Exception during initial load', e)
           process.exit(1)
         }
-      } else if (
-        process.env.IPNS_MODE &&
-        process.env.IPNS_MODE.toLowerCase() == 'init'
-      ) {
+      } else if (process.env.STARTUP_MODE === 'init') {
         this.docIndex = {
-          _created: Date.now()
+          _created: Date.now(),
+          _version: 1
         }
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (blank):', cidBase58)
-        await this.publish(cidBase58)
-        log('\nSet IPNS_MODE=load')
+        this.pin(cidBase58)
+        log('\nSet STARTUP_MODE=load-from-pinner')
         log('and restart to continue')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
       } else {
-        log('\nFirst, set IPNS_MODE=init to create empty index on IPNS,')
-        log('and then set IPNS_MODE=load to load it.')
+        log('\nFirst, set STARTUP_MODE=init to create empty index on pinner,')
+        log('and then set STARTUP_MODE=load-from-pinner to load it.')
         while (true) {
           await delay(60 * 1000) // Infinite loop
         }
@@ -179,14 +186,16 @@ class AppPinner extends EventEmitter {
     })
     .then(() => {
       return new Promise((resolve, reject) => {
+        log('starting js-ipfs')
         const ipfsOptions = (this._options && this._options.ipfs) || {}
         this.ipfs = IPFS(this, ipfsOptions)
+        this.ipfs.on('error', (err) => this._handleIPFSError(err))
         if (this.ipfs.isOnline()) {
-          this.ipfs.on('error', (err) => this._handleIPFSError(err))
+          log('started js-ipfs')
           resolve()
         } else {
           this.ipfs.once('ready', () => {
-            this.ipfs.on('error', (err) => this._handleIPFSError(err))
+            log('started js-ipfs')
             resolve()
           })
         }
@@ -329,6 +338,7 @@ class AppPinner extends EventEmitter {
         const fqn = collaboration.fqn()
         const delta = collaboration.shared.stateAsDelta()
         const clock = delta[1]
+        const version = this.docIndex._version + 1
 
         log('Saving state:', fqn)
         Object.keys(clock).sort().forEach(key => {
@@ -353,7 +363,8 @@ class AppPinner extends EventEmitter {
           main: mainCid,
           clock,
           date: Date.now(),
-          subs: {}
+          subs: {},
+          version
         }
 
         for (let name of collaboration._subs.keys()) {
@@ -368,13 +379,11 @@ class AppPinner extends EventEmitter {
             cid
           }
         }
-        if (!this.docIndex._created && process.env.FORCE_CREATED) {
-          this.docIndex._created = Date.now()
-        }
+        this.docIndex._version = version
         this.indexCid = await this.backplaneIpfs.dag.put(this.docIndex)
         const cidBase58 = this.indexCid.toBaseEncodedString()
         log('DocIndex CID (updated):', cidBase58)
-        this.pinAndPublish(cidBase58)
+        this.pin(cidBase58)
         resetActivityTimeout()
       } catch (e) {
         log('Exception during update:', e)
@@ -412,48 +421,31 @@ class AppPinner extends EventEmitter {
     await this.ipfs.stop()
   }
 
-  async pinAndPublish (cidBase58) {
+  async pin (cidBase58) {
     this.pendingCid = cidBase58
     log('Queued', this.pendingCid)
     if (!this.queue) {
       this.queue = new PQueue({concurrency: 1})
     }
-    this.queue.add(() => this.pinAndPublishWorker())
+    this.queue.add(() => this.pinWorker())
   }
 
-  async pinAndPublishWorker () {
+  async pinWorker () {
     const cidBase58 = this.pendingCid
     if (!cidBase58) return
-    log('Pinning and publishing', cidBase58)
+    log('Pinning', cidBase58)
     this.pendingCid = null
     const prevCid = this.lastPinnedCid
     if (cidBase58 !== this.lastPinnedCid) {
-      await cluster.pin(cidBase58)
+      await cluster.pin(cidBase58, this.docIndex._version, this.backplaneId)
       this.lastPinnedCid = cidBase58
-    }
-    if (cidBase58 !== this.lastPublishedCid) {
-      await this.publish(cidBase58)
-      this.lastPublishedCid = cidBase58
     }
     if (prevCid && prevCid !== cidBase58) {
       await cluster.unpin(prevCid)
     }
-    log('Pinned and published', cidBase58)
-  }
-
-  async publish (cidBase58) {
-    const ipfsPath = `/ipfs/${cidBase58}`
-    log('Updating IPNS...', ipfsPath)
-    const start = Date.now()
-    try {
-      await this.backplaneIpfs.name.publish(ipfsPath)
-      const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-      const ipnsPath = `/ipns/${this.backplaneId}`
-      log('IPNS updated:', ipnsPath, elapsed)
-      log('  CID:', cidBase58)
-    } catch (e) {
-      log('IPNS Exception:', e)
-    }
+    log('Pinned', cidBase58)
+    // Delay to prevent pinning too often
+    await delay(30000)
   }
 
   async loadBackupsFromIpfs (name) {

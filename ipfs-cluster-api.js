@@ -18,15 +18,15 @@ function useTunnel () {
   apiBase = 'http://127.0.0.1:29097'
 }
 
-async function pin (cid) {
+async function pin (cid, version, peerId) {
   const apiBaseUrl = new URL(apiBase)
-  let name = 'peer-base-pinner'
+  let name = `peer-base-pinner: ${version} ${peerId}`
   if (process.env.IPFS_CLUSTER_LABEL) {
-    name += `: ${process.env.IPFS_CLUSTER_LABEL}`
+    name += ` ${process.env.IPFS_CLUSTER_LABEL}`
   }
   const opts = `name=${encodeURIComponent(name)}`
   const apiPinAdd = new URL(`/pins/${cid}?${opts}`, apiBaseUrl)
-  log(`pinning ${cid} to cluster`)
+  log(`pinning ${cid} to cluster, version ${version}`)
   const start = Date.now()
   const res = await fetch(
     apiPinAdd.href,
@@ -72,7 +72,7 @@ async function pin (cid) {
       })
       if (finished) {
         const elapsed = `(${((Date.now() - start) / 1000).toFixed(1)}s)`
-        log('pinned', cid, elapsed)
+        log('pinned', version, cid, elapsed)
         break
       }
       const notPinning = Object.keys(json.peer_map).some(peerId => {
@@ -117,8 +117,28 @@ async function unpin (cid) {
   }
 }
 
+async function getPins () {
+  const apiBaseUrl = new URL(apiBase)
+  const apiPinLs = new URL(`/allocations?filter=all`, apiBaseUrl)
+  log(`listing pins on cluster`)
+  const res = await fetch(
+    apiPinLs.href,
+    {
+      headers: {
+        'Authorization': `Basic ${auth}`
+      }
+    }
+  )
+  if (!res.ok) {
+    throw new Error('Pin ls failed')
+  }
+  const json = await res.json()
+  return json
+}
+
 module.exports = {
   useTunnel,
   pin,
-  unpin
+  unpin,
+  getPins
 }
