@@ -136,7 +136,7 @@ class AppPinner extends EventEmitter {
               if (match && match[1] === this.backplaneId) return true
             })
             .map(({ name, cid }) => ({
-              cid,
+              cid: typeof cid === 'object' ? cid['/'] : cid,
               version: Number(name.match(/^peer-base-pinner: (\d+) /)[1])
             }))
             .sort((a, b) => a.version - b.version)
